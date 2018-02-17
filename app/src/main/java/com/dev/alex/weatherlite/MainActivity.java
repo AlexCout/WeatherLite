@@ -1,74 +1,114 @@
 package com.dev.alex.weatherlite;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
-import android.support.design.widget.BottomNavigationView;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.view.MenuItem;
-import android.widget.ListView;
 import android.widget.TextView;
 
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
+import android.widget.Toast;
 
-import com.android.volley.Cache;
 import com.android.volley.RequestQueue;
 import com.android.volley.VolleyError;
 import com.android.volley.Response;
 import com.android.volley.Request;
-import com.android.volley.toolbox.DiskBasedCache;
-import com.android.volley.toolbox.*;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.json.JSONException;
 
-import java.io.Console;
-import java.io.File;
+import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
-    String baseURL = "https://api.darksky.net/forecast/934e635759a894bd6806adb711aa951b/37.8267,-122.4233?exclude=minutely,hourly,daily,alerts,flags";
-    String url;
+public class MainActivity
+        extends AppCompatActivity
+        implements GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener {
+
+    String baseURL = "https://api.darksky.net/forecast/";
+    String darkSkyKey = "934e635759a894bd6806adb711aa951b";
+    String darkSkyExcludes = "?exclude=minutely,hourly,daily,alerts,flags&units=auto";
     RequestQueue requestQueue;
 
-    Forecast mainForecast;
+    GoogleApiClient mGoogleApiClient;
+    Location location;
 
-    Button btn2;
+    private FusedLocationProviderClient mFusedLocationClient;
 
-    private TextView temp;
+
+    private TextView lblTemperature;
+    private TextView lblFeelsLike;
+
+    public MainActivity() {
+    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        temp = findViewById(R.id.currentTemperature);
-        btn2 = findViewById(R.id.button2);
 
-        btn2.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                updateForecast();
-            }
-        });
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API).build();
+        mGoogleApiClient.connect();
+
+        LocationRequest mLocationRequest = new LocationRequest();
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(mLocationRequest);
+        PendingResult<LocationSettingsResult> result =
+                LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient, builder.build());
+
+
         requestQueue = Volley.newRequestQueue(this);
+
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+
+        lblTemperature = findViewById(R.id.lblTemperature);
+        lblFeelsLike = findViewById(R.id.lblFeelsLike);
+
+
+
 
     }
 
-    private void updateForecast(){
-        this.url = this.baseURL;
-        Log.i("track","1");
+
+    private void updateForecast() {
+        String urlDarkSky = getDarkSkyURL();
+
+        Log.i("track", urlDarkSky);
         JSONArray array;
 
         JsonObjectRequest jsObjRequest = new JsonObjectRequest
-                (Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+                (Request.Method.GET, urlDarkSky, null, new Response.Listener<JSONObject>() {
 
                     @Override
                     public void onResponse(JSONObject response) {
@@ -80,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onErrorResponse(VolleyError error) {
-                        Log.e("errorRequest","Error response: " + error.getMessage());
+                        Log.e("errorRequest", "Error response: " + error.getMessage());
                     }
                 });
 
@@ -90,8 +130,71 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateListView(Forecast f) {
-        Log.i("test","ici");
-        temp.setText("Temperature: "+ f.currently.temperature);
+        lblTemperature.setText("Temperature: " + f.currently.temperature);
+        lblFeelsLike.setText("Feels like: " + f.currently.apparentTemperature);
 
+    }
+
+    private String getDarkSkyURL() {
+        String latitude = "58.5664518";
+        String longitude = "-76.411153";
+        if (location != null){
+            latitude = ""+location.getLatitude();
+            longitude = ""+location.getLongitude();
+        }
+
+        return baseURL + darkSkyKey + "/" + latitude + "," + longitude + darkSkyExcludes;
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ) {
+            checkPermission();
+        }
+        location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+
+        if (location != null) {
+            Log.d("location","location: "+location.getLatitude()+","+location.getLongitude());
+            updateForecast();
+        }
+        else {
+            new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Please activate location")
+                    .setMessage("Click ok to goto settings else exit.")
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            startActivity(intent);
+                        }
+                    })
+                    .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            System.exit(0);
+                        }
+                    })
+                    .show();
+        }
+
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.i("GoogleAPI", "Connection failed: ConnectionResult.getErrorCode() = "+ connectionResult.getErrorCode());
+    }
+
+    public void checkPermission(){
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                ){//Can add more as per requirement
+
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},
+                    123);
+        }
     }
 }

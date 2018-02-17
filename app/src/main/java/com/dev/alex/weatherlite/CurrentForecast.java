@@ -19,10 +19,10 @@ public class CurrentForecast {
     public double pressure;
     public double windSpeed;
     public double windGust;
-    public int windBearing;
+    public double windBearing;
     public double cloudCover;
-    public int uvIndex;
-    public int visibility;
+    public double uvIndex;
+    public double visibility;
     public double ozone;
 
 
