@@ -15,6 +15,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import android.util.Log;
@@ -43,6 +45,7 @@ import com.google.gson.Gson;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 public class MainActivity
@@ -63,6 +66,7 @@ public class MainActivity
 
     private TextView lblTemperature;
     private TextView lblFeelsLike;
+    private ListView mainListView;
 
     public MainActivity() {
     }
@@ -94,7 +98,7 @@ public class MainActivity
 
         lblTemperature = findViewById(R.id.lblTemperature);
         lblFeelsLike = findViewById(R.id.lblFeelsLike);
-
+        mainListView = findViewById(R.id.mainListView);
 
 
 
@@ -129,10 +133,12 @@ public class MainActivity
         requestQueue.add(jsObjRequest);
     }
 
-    private void updateListView(Forecast f) {
+    public void updateListView(Forecast f) {
         lblTemperature.setText("Temperature: " + f.currently.temperature);
         lblFeelsLike.setText("Feels like: " + f.currently.apparentTemperature);
 
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1, f.currently.getListValues());
+        mainListView.setAdapter(adapter);
     }
 
     private String getDarkSkyURL() {

@@ -10,4 +10,6 @@ public class Forecast {
     public String timezone;
     public CurrentForecast currently;
     public double offset;
+
+    
 }
